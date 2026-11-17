@@ -1,4 +1,4 @@
-// Cloudflare Pages Function: proxy /api/* -> Hermes dashboard backend (via tunnel)
+// Cloudflare Pages Function: proxy /api/status -> Hermes backend (via tunnel)
 // Menghindari CORS: browser -> Pages (same-origin) -> backend Hermes di laptop.
 
 interface Env {
@@ -17,11 +17,8 @@ const SKIP_RESP_HEADERS = new Set([
 export const onRequest = async (context: any) => {
   const { request, env } = context;
   const backend = (env.HERMES_BACKEND_URL || "http://localhost:9119").replace(/\/+$/, "");
-  const url = new URL(request.url);
-  const path = url.pathname.replace(/^\/api\/?/, "").replace(/\/+$/, "");
-  const target = `${backend}/${path}${url.search}`;
+  const target = `${backend}/api/status${new URL(request.url).search}`;
 
-  // CORS preflight
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -29,7 +26,6 @@ export const onRequest = async (context: any) => {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
         "Access-Control-Allow-Headers": "*",
-        "Access-Control-Max-Age": "86400",
       },
     });
   }
@@ -40,18 +36,8 @@ export const onRequest = async (context: any) => {
     headers.set(k, v);
   }
 
-  let body: BodyInit | undefined;
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    body = request.body as unknown as BodyInit;
-  }
-
   try {
-    const res = await fetch(target, {
-      method: request.method,
-      headers,
-      body,
-      redirect: "manual",
-    });
+    const res = await fetch(target, { method: request.method, headers, redirect: "manual" });
     const respHeaders = new Headers();
     res.headers.forEach((v, k) => {
       if (SKIP_RESP_HEADERS.has(k)) return;
